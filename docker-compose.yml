@@ -1,0 +1,45 @@
+# Local backing services for the LLM Gateway.
+# The gateway itself runs on the host via `./gradlew bootRun` during development;
+# it joins this file once the Dockerfile exists (E15).
+services:
+  postgres:
+    # pgvector, not stock postgres: the semantic cache (E9) needs the vector type.
+    image: pgvector/pgvector:pg16
+    container_name: gateway-postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:-gateway}
+      POSTGRES_USER: ${DB_USER:-gateway}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-gateway}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      # pg_isready, not a port probe: the entrypoint opens the port before the
+      # database is actually accepting connections.
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-gateway} -d ${DB_NAME:-gateway}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: gateway-redis
+    # AOF persistence: rate limit buckets and the metering stream must survive a restart.
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:
