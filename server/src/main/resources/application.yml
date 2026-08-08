@@ -14,7 +14,9 @@ spring:
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: none
+      # validate, never update: Flyway owns the schema. Hibernate only checks that
+      # the entities match what the migrations built, and refuses to start if not.
+      ddl-auto: validate
 
   flyway:
     enabled: true
